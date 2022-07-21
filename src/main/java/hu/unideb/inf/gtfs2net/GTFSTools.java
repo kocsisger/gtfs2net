@@ -5,7 +5,11 @@ import lombok.Data;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -14,7 +18,7 @@ public class GTFSTools {
     private static Logger logger = Logger.getLogger("GTFSTools.class");
 
     static {
-        logger.setLevel(Level.WARNING);
+        logger.setLevel(Level.INFO);
     }
 
     @Data
@@ -44,6 +48,77 @@ public class GTFSTools {
 
     private static int stopID_int = 0;
 
+    public static class ProcessConfig{
+        private final String folderPath;
+        private int radius;
+        private int radiusStep;
+
+        private ProcessConfig(ProcessConfigBuilder pcb){
+            this.folderPath=pcb.folderPath;
+            this.radius=pcb.radius;
+            this.radiusStep= pcb.radiusStep;
+        }
+        public static class ProcessConfigBuilder{
+            private final String folderPath;
+            private int radius=0;
+            private int radiusStep=1;
+
+            public ProcessConfigBuilder(String folderPath){
+                this.folderPath=folderPath;
+            }
+
+            public ProcessConfigBuilder withRadius(int radius){
+                this.radius=radius;
+                return this;
+            }
+            public ProcessConfigBuilder withRadiusStep(int radiusStep){
+                this.radiusStep=radiusStep;
+                return this;
+            }
+            public ProcessConfig build(){
+                ProcessConfig pc = new ProcessConfig(this);
+                return pc;
+            }
+        }
+    }
+
+
+    public static void processFolder(String folderPath){
+        GTFSTools.ProcessConfig pc = new GTFSTools.ProcessConfig.ProcessConfigBuilder(folderPath).withRadius(0).withRadiusStep(0).build();
+        processFolder(pc);
+    }
+    public static void processFolder(ProcessConfig pc) {
+        String folderPath = pc.folderPath;
+        int radius = pc.radius;
+        int radiusStep = pc.radiusStep;
+        PrintWriter pw;
+        String outputFolder = folderPath+ "/gtfs2netOutput";
+        new File(outputFolder).mkdirs();
+        File file = new File(folderPath);
+        String[] directories = file.list((File current, String name) -> new File(current, name).isDirectory());
+        if (directories == null) return;
+        for (String directory : directories) {
+            String sourcePath = folderPath + "/" + directory;
+            System.out.println("Processing: " + sourcePath);
+            try {
+                for (int r = 0; r <= radius; r += radiusStep) {
+                    Map<String, GTFSTools.Stop> stops = readStops(sourcePath);
+                    registerCloseStopsAsOne(stops, r);
+                    readStopTimes(sourcePath, stops);
+                    printStopsAsNetworkToFile(stops, outputFolder + "/" + directory + "_" + r + ".txt");
+
+                    pw = new PrintWriter(new FileOutputStream(outputFolder + "/nodenum_" + directory + ".txt", true));
+                    System.out.println(r + ", " + Files.lines(Path.of(outputFolder + "/" + directory + "_" + r + ".txt"), StandardCharsets.UTF_8).count());
+                    pw.println(r + ", " + Files.lines(Path.of(outputFolder + "/" + directory + "_" + r + ".txt"), StandardCharsets.UTF_8).count());
+                    pw.close();
+                }
+            } catch (Exception e) {
+                logger.log(Level.INFO,"Error while processing " + directory + "... Skipping to the next one.");
+                logger.log(Level.FINER,e.getMessage() + e.getStackTrace());
+            }
+        }
+    }
+
     public static Map<String, Stop> readStops(String filename) throws FileNotFoundException {
         stopID_int = 0;
         filename += "/stops.txt";
@@ -69,7 +144,7 @@ public class GTFSTools {
                 station = fields[station_idx].equals("1");
                 parentStation = fields[parentStation_idx];
             } catch (ArrayIndexOutOfBoundsException ex) {
-                logger.log(Level.INFO, "Exception: " + ex.getMessage());
+                logger.log(Level.FINE, "Exception: " + ex.getMessage());
                 station = false;
                 parentStation = "";
             }
@@ -77,7 +152,7 @@ public class GTFSTools {
             try {
                 records.put(fields[id_idx], new Stop(fields[id_idx], new HashSet<>(), station, parentStation, stopID_int++, fields[name_idx], Double.parseDouble(fields[lat_idx]), Double.parseDouble(fields[lon_idx])));
             } catch (NumberFormatException ex) {
-                logger.log(Level.INFO, "Exception: " + ex.getMessage());
+                logger.log(Level.FINE, "Exception: " + ex.getMessage());
                 records.put(fields[id_idx], new Stop(fields[id_idx], new HashSet<>(), station, parentStation, stopID_int++, fields[name_idx], Double.parseDouble(fields[lat_idx].replaceAll("\"", "")), Double.parseDouble(fields[lon_idx].replaceAll("\"", ""))));
             }
         }
@@ -103,7 +178,7 @@ public class GTFSTools {
                 act_seq = Integer.parseInt(fields[seq_idx]);
             } catch (NumberFormatException numberFormatException) {
                 //System.err.println(numberFormatException.getMessage());
-                logger.log(Level.INFO, "Exception: " + numberFormatException.getMessage());
+                logger.log(Level.FINE, "Exception: " + numberFormatException.getMessage());
                 act_seq = Integer.parseInt(fields[seq_idx].replaceAll("\"", ""));
             }
             actStop = fields[id_idx];
@@ -114,7 +189,7 @@ public class GTFSTools {
                     stops.get(prevStop).getNeighbors().add(actStop);
                 } catch (NullPointerException npe) {
                     //System.err.println(act_seq + " " + prev_seq);
-                    logger.log(Level.INFO, "Exception: " + act_seq + " " + prev_seq);
+                    logger.log(Level.FINE, "Exception: " + act_seq + " " + prev_seq);
                 }
             }
             prev_seq = act_seq;
@@ -212,7 +287,7 @@ public class GTFSTools {
                         }
                     }
                 } catch (NullPointerException exception) {
-                    logger.log(Level.WARNING, "Exception: " + exception.getMessage() + "\n" + stop.parentStation);
+                    logger.log(Level.FINE, "Exception: " + exception.getMessage() + "\n" + stop.parentStation);
                 }
             }
 

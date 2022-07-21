@@ -1,57 +1,61 @@
 package hu.unideb.inf.gtfs2net;
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.apache.commons.cli.*;
 
 public class Main {
-    private static PrintWriter pw;
+    public static void main(String... args) {
+        Options options = new Options();
 
-    public static void main(String[] args) {
-        PrintWriter pw;
+        Option gtfs = new Option("i", "input", true, "gtfs input(s) (required)");
+        gtfs.setRequired(true);
+        options.addOption(gtfs);
 
-            File file = new File("../gtfs2");
-            String[] directories = file.list((File current, String name) -> new File(current, name).isDirectory());
-            if (directories==null) return;
-            //directories = new String[]{"nyc"};
-            for (String directory : directories) {
-                String sourcePath = "../gtfs2/" + directory;
-                System.out.println("Processing: " + sourcePath);
-                try {
-                    for (int r = 0; r <= 150; r += 150) {
-                        Map<String, GTFSTools.Stop> stops = GTFSTools.readStops(sourcePath);
-                        GTFSTools.registerCloseStopsAsOne(stops, r);
-                        GTFSTools.readStopTimes(sourcePath, stops);
-                        GTFSTools.printStopsAsNetworkToFile(stops, "gtfs2/" + directory + "_" + r + ".txt");
+        Option type = new Option("t", "type", true, "gtfs input type {zip|dir|dirs} (zip by default, optional)");
+        type.setRequired(false);
+        options.addOption(type);
 
-                        pw = new PrintWriter(new FileOutputStream("gtfs2/nodenum_" + directory + ".txt", true));
-                        System.out.println(r + ", " + Files.lines(Path.of("gtfs2/" + directory + "_" + r + ".txt"), StandardCharsets.UTF_8).count());
-                        pw.println(r + ", " + Files.lines(Path.of("gtfs2/" + directory + "_" + r + ".txt"), StandardCharsets.UTF_8).count());
-                        pw.close();
-                    }
-                } catch (Exception e) {
-                    System.out.println("Error while processing " + directory + "... Skipping to the next one.");
-                }
-            }
-        }
+        Option radius = new Option("r", "radius", true, "node merging radius (default 150)");
+        radius.setRequired(false);
+        options.addOption(radius);
 
+        Option step = new Option("s", "step", true, "node merging radius step (default 150)");
+        step.setRequired(false);
+        options.addOption(step);
 
-    private static void printStops(Map<String, GTFSTools.Stop> stops) {
+        CommandLineParser parser = new BasicParser();
+        HelpFormatter formatter = new HelpFormatter();
+        CommandLine cmd = null;//not a good practice, it serves it purpose
+
         try {
-            pw = new PrintWriter(new FileOutputStream("log_nyc_test.txt", false));
-            for (GTFSTools.Stop stop : stops.values()) {
-                pw.println(stop.stopID + "," + stop.stopName + "," + stop.isStation + "," + stop.hasParentStation() + "," + stop.parentStation + "," + stop.lat + "," + stop.lon + "," + stop.neighbors.toString().replaceAll(",", ";"));
-            }
-            pw.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            cmd = parser.parse(options, args);
+        } catch (ParseException e) {
+            System.out.println(e.getMessage());
+            formatter.printHelp("gtfs2net", options);
+            System.exit(1);
         }
+
+        String gtfsPath = cmd.getOptionValue('i');
+        String gtfsType = cmd.getOptionValue('t');
+        if (gtfsType==null||!gtfsType.equals("dir")&&!gtfsType.equals("dirs")) gtfsType="zip";
+        int r;
+        try{
+            r=Integer.parseInt(cmd.getOptionValue('r'));
+            if (r<0) throw new Exception();
+        }catch (Exception e){
+            r=150;
+        }
+        int rs;
+        try{
+            rs=Integer.parseInt(cmd.getOptionValue('r'));
+            if ((rs<0)||(rs>r)) throw new Exception();
+        }catch (Exception e){
+            rs=150;
+        }
+
+        System.out.println("Processing " + gtfsPath + " as " + gtfsType +". r=" + r + ", s=" + rs);
+
+        GTFSTools.ProcessConfig pc = new GTFSTools.ProcessConfig.ProcessConfigBuilder(gtfsPath).withRadius(r).withRadiusStep(rs).build();
+        //GTFSTools.processFolder(pc);
     }
 }
 
