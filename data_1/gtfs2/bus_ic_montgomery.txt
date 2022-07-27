@@ -1,9 +1,0 @@
-4706,4706,VirtualStation1,VirtualStation1
-4706,4707,VirtualStation1,VirtualStation2
-4707,4706,VirtualStation2,VirtualStation1
-4707,4708,VirtualStation2,VirtualStation3
-4708,4707,VirtualStation3,VirtualStation2
-4708,4709,VirtualStation3,VirtualStation4
-4709,4710,VirtualStation4,VirtualStation5
-4709,4708,VirtualStation4,VirtualStation3
-4709,4709,VirtualStation4,VirtualStation4
