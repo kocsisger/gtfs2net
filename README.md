@@ -14,4 +14,5 @@ usage: gtfs2net <br>
 -v,--verbose   verbose mode
 -----------------------------------------
 Alternatively you can use the wrapped .exe file:
-[gtfs2net.exe](https://github.com/kocsisger/gtfs2net/blob/main/gtfs2net.exe)
+[gtfs2net.exe](https://github.com/kocsisger/gtfs2net/raw/main/gtfs2net.exe)
+
