@@ -19,11 +19,12 @@ public class GTFSTools {
 
     static {
         logger.setLevel(Level.FINE);
-        Logger.getLogger("").getHandlers()[0].setLevel(Level.WARNING);
+        //Logger.getLogger("").getHandlers()[0].setLevel(Level.INFO);
+        Logger.getLogger("").getHandlers()[0].setLevel(Level.FINE);
     }
 
     public static void setVerboseConsoleLogLevel() {
-        Logger.getLogger("").getHandlers()[0].setLevel(Level.INFO);
+        Logger.getLogger("").getHandlers()[0].setLevel(Level.WARNING);
     }
 
     @Data
@@ -133,15 +134,22 @@ public class GTFSTools {
             logger.log(Level.INFO, e.getMessage() + e.getStackTrace());
         }
         try {
+            int stopsNumR0=0;
             for (int r = 0; r <= pc.radius; r += pc.radiusStep) {
                 Map<String, GTFSTools.Stop> stops = readStops(pc.inputFolderPath);
                 registerCloseStopsAsOne(stops, r);
                 readStopTimes(pc.inputFolderPath, stops);
                 String filenamePrefix = pc.inputFolderPath.substring(pc.inputFolderPath.lastIndexOf('/')+1);
                 printStopsAsNetworkToFile(stops, pc.outputFolderPath + "/" + filenamePrefix + "_" + r + ".txt");
-                pw = new PrintWriter(new FileOutputStream(pc.outputFolderPath + "/nodenum_" + filenamePrefix + ".txt", true));
-                logger.log(Level.INFO,"r: " + r + ", nodenum: " + Files.lines(Path.of(pc.outputFolderPath + "/" + filenamePrefix + "_" + r + ".txt"), StandardCharsets.UTF_8).count());
-                pw.println(r + ", " + Files.lines(Path.of(pc.outputFolderPath + "/" + filenamePrefix + "_" + r + ".txt"), StandardCharsets.UTF_8).count());
+
+                int stopsNum=0;
+                for (Stop stop: stops.values()){
+                    if (!stop.hasParentStation()) stopsNum++;
+                }
+                if (r==0) stopsNumR0 = stopsNum;
+                pw = new PrintWriter(new FileOutputStream(pc.outputFolderPath + "/edgenum_" + filenamePrefix + ".txt", true));
+                logger.log(Level.INFO,"r: " + r + ", edgenum: " + Files.lines(Path.of(pc.outputFolderPath + "/" + filenamePrefix + "_" + r + ".txt"), StandardCharsets.UTF_8).count());
+                pw.println(r + ", " + Files.lines(Path.of(pc.outputFolderPath + "/" + filenamePrefix + "_" + r + ".txt"), StandardCharsets.UTF_8).count()  + ", " + stopsNum  + ", " + stopsNum/(double)stopsNumR0);
                 pw.close();
             }
         } catch (Exception e) {
@@ -271,9 +279,9 @@ public class GTFSTools {
 
     private static double lonDistance(Stop stop1, Stop stop2) {
         double lat1, lon1, lat2, lon2;
-        lat1 = 0;
+        lat1 = stop1.getLat();;
         lon1 = stop1.getLon();
-        lat2 = 0;
+        lat2 = stop1.getLat(); //set to be similar to lat1 to count only lon distance
         lon2 = stop2.getLon();
         var R = 6378.137; // Radius of earth in KM
         var dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180;
@@ -292,6 +300,17 @@ public class GTFSTools {
         listResult.sort((s1, s2) -> (int) Math.signum(((Stop) s1).getLon() - ((Stop) s2).getLon()));
 
         return listResult;
+    }
+
+    private static double diameterOfStopsSet(Set<Stop> stops){
+        List<Stop> stopsList = new ArrayList<>(stops);
+        double diameter = 0;
+        for (int i = 0; i < stopsList.size(); i++) {
+            for (int j = i; j < stopsList.size(); j++) {
+                if (distance(stopsList.get(i), stopsList.get(j))>diameter) diameter=distance(stopsList.get(i), stopsList.get(j));
+            }
+        }
+        return diameter;
     }
 
     public static void registerCloseStopsAsOne(Map<String, Stop> stops, double radius) {
@@ -329,8 +348,14 @@ public class GTFSTools {
             }
             for (Stop stop : closeStops) {
                 stop.setParentStation(virtualParent.getStopName());
+               // System.out.println(stop.getStopName() + " -->> " + virtualParent.getStopName());
             }
+            //System.out.println("" + radius + "," + diameterOfStopsSet(closeStops));
         }
+        /*System.out.println(stops.get("638191"));
+        System.out.println(stops.get("638190"));
+        System.out.println("lonDistance: " + lonDistance( stops.get("638191"),stops.get("638190") ) );
+        System.out.println("Distance: " + distance( stops.get("638191"),stops.get("638190") ) );*/
     }
 
     private static Set<Stop> findCloseStopsOf(int actIdx, ArrayList<Stop> stops, ArrayList<Boolean> stopsProcessed, double radius) {

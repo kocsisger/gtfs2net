@@ -39,7 +39,7 @@ public class Main {
 
         CommandLineParser parser = new BasicParser();
         HelpFormatter formatter = new HelpFormatter();
-        CommandLine cmd = null;//not a good practice, it serves it purpose
+        CommandLine cmd = null;//not a good practice, it serves its purpose
 
         try {
             cmd = parser.parse(options, args);
@@ -64,10 +64,10 @@ public class Main {
         }
         int rs;
         try {
-            rs = Integer.parseInt(cmd.getOptionValue('r'));
+            rs = Integer.parseInt(cmd.getOptionValue('s'));
             if ((rs < 0) || (rs > r)) throw new Exception();
         } catch (Exception e) {
-            rs = 150;
+            rs = r;
         }
 
         System.out.println("Processing " + gtfsPath + " as " + gtfsType + ". r=" + r + ", s=" + rs);
